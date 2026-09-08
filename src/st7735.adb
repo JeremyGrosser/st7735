@@ -21,43 +21,64 @@ package body ST7735 is
 
    No_Data : constant UInt8_Array (1 .. 0) := (1 .. 0 => 0);
 
-   --  One pixel per two bytes, in the order the controller expects them:
-   --  RGB565, high byte first. Update can then hand the whole thing to
-   --  SPI_Write untouched.
-   FB : UInt8_Array (0 .. (Width * Height * 2) - 1);
+   --  One row of black, the unit Clear streams in.
+   Blank_Row : constant UInt8_Array (0 .. (Width * 2) - 1) := (others => 0);
+
+   procedure Start_Command (Cmd : UInt8);
+   procedure Write_Data (Data : UInt8_Array);
+   procedure End_Command;
 
    procedure Command
       (Cmd  : UInt8;
        Data : UInt8_Array := No_Data);
 
-   procedure Set_Address_Window;
+   procedure Set_Address_Window
+      (X1, X2 : Column;
+       Y1, Y2 : Row);
 
-   function To_RGB565
-      (C : Color)
-      return UInt16;
+   --  CS is held low for the whole of a command, from its opcode through the
+   --  last byte of its data, so that Clear can stream a screenful of pixels
+   --  into one memory write a row at a time.
+   procedure Start_Command (Cmd : UInt8) is
+   begin
+      Set_CS (False);
+      Set_DC (False);
+      SPI_Write ((1 => Cmd));
+      Set_DC (True);
+   end Start_Command;
+
+   procedure Write_Data (Data : UInt8_Array) is
+   begin
+      SPI_Write (Data);
+   end Write_Data;
+
+   procedure End_Command is
+   begin
+      Set_CS (True);
+   end End_Command;
 
    procedure Command
       (Cmd  : UInt8;
        Data : UInt8_Array := No_Data)
    is
    begin
-      Set_CS (False);
-      Set_DC (False);
-      SPI_Write ((1 => Cmd));
+      Start_Command (Cmd);
       if Data'Length > 0 then
-         Set_DC (True);
-         SPI_Write (Data);
+         Write_Data (Data);
       end if;
-      Set_CS (True);
+      End_Command;
    end Command;
 
-   --  Point the frame memory address counter at the visible area, so that the
-   --  RAMWR in Update walks it from the top left to the bottom right.
-   procedure Set_Address_Window is
-      XS : constant UInt16 := UInt16 (X_Offset);
-      XE : constant UInt16 := UInt16 (X_Offset + Width - 1);
-      YS : constant UInt16 := UInt16 (Y_Offset);
-      YE : constant UInt16 := UInt16 (Y_Offset + Height - 1);
+   --  Confine writes to the given rectangle. The controller walks it left to
+   --  right, top to bottom, and wraps back to X1, Y1 at the end.
+   procedure Set_Address_Window
+      (X1, X2 : Column;
+       Y1, Y2 : Row)
+   is
+      XS : constant UInt16 := UInt16 (Natural (X1) + X_Offset);
+      XE : constant UInt16 := UInt16 (Natural (X2) + X_Offset);
+      YS : constant UInt16 := UInt16 (Natural (Y1) + Y_Offset);
+      YE : constant UInt16 := UInt16 (Natural (Y2) + Y_Offset);
    begin
       Command (CASET,
          (UInt8 (Shift_Right (XS, 8)), UInt8 (XS and 16#FF#),
@@ -69,8 +90,6 @@ package body ST7735 is
 
    procedure Initialize is
    begin
-      Clear;
-
       --  Both of these need 120 ms before the next command can be sent: the
       --  reset to load register defaults, the sleep out for the supply
       --  voltages and oscillator to settle (datasheet 10.1.2 and 10.1.11).
@@ -88,43 +107,40 @@ package body ST7735 is
 
       Command (INVOFF);
       Command (NORON);
-      --  NORON and DISPON take effect at the next V-sync (datasheet 10.1
-      --  note 4), which is at most one frame away.
+
+      --  Frame memory contents are undefined after reset, so blank it before
+      --  turning the panel on rather than showing a screen of noise.
+      Clear;
+
+      --  DISPON takes effect at the next V-sync (datasheet 10.1 note 4),
+      --  which is at most one frame away.
       Delay_Milliseconds (10);
       Command (DISPON);
-
-      --  Frame memory contents are undefined after reset, so push the blank
-      --  framebuffer before anything can be seen.
-      Update;
    end Initialize;
 
    procedure Clear is
    begin
-      FB := (others => 0);
+      Set_Address_Window (Column'First, Column'Last, Row'First, Row'Last);
+      Start_Command (RAMWR);
+      for Y in Row loop
+         Write_Data (Blank_Row);
+      end loop;
+      End_Command;
    end Clear;
-
-   function To_RGB565
-      (C : Color)
-      return UInt16
-   is (Shift_Left (UInt16 (C.R), 11) or
-       Shift_Left (UInt16 (C.G), 5) or
-                   UInt16 (C.B));
 
    procedure Set_Pixel
       (X : Column;
        Y : Row;
        C : Color)
    is
-      I : constant Natural := ((Natural (Y) * Width) + Natural (X)) * 2;
-      P : constant UInt16 := To_RGB565 (C);
+      --  RGB565: red in the top five bits, then green, then blue, sent most
+      --  significant byte first.
+      P : constant UInt16 :=
+         Shift_Left (UInt16 (C.R), 11) or
+         Shift_Left (UInt16 (C.G), 5) or
+                     UInt16 (C.B);
    begin
-      FB (I)     := UInt8 (Shift_Right (P, 8));
-      FB (I + 1) := UInt8 (P and 16#FF#);
+      Set_Address_Window (X, X, Y, Y);
+      Command (RAMWR, (UInt8 (Shift_Right (P, 8)), UInt8 (P and 16#FF#)));
    end Set_Pixel;
-
-   procedure Update is
-   begin
-      Set_Address_Window;
-      Command (RAMWR, FB);
-   end Update;
 end ST7735;

@@ -26,8 +26,6 @@ begin
       end loop;
    end loop;
 
-   Update;
-
    loop
       null;
    end loop;

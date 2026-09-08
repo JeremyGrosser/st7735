@@ -3,6 +3,9 @@ with HAL; use HAL;
 --  Driver for the Sitronix ST7735R TFT controller in 16 bit/pixel mode over a
 --  4-wire serial (MCU) interface. Register and timing references in the body
 --  are to the ST7735R datasheet, V0.2, 2009-08-05.
+--
+--  Drawing goes straight out to the controller's frame memory; nothing is
+--  buffered on this side, so the driver holds no state and needs no RAM.
 generic
    --  Chip select. The display is selected while CS is low, so Set_CS (False)
    --  begins a transaction and Set_CS (True) ends it.
@@ -38,26 +41,27 @@ package ST7735 is
    type Column is range 0 .. Width - 1;
    type Row    is range 0 .. Height - 1;
 
+   --  Component intensities. Set_Pixel packs these into the RGB565 pixel the
+   --  controller expects.
    type Color is record
       R : UInt5;
       G : UInt6;
       B : UInt5;
    end record;
 
-   --  Reset the controller, configure it for 16 bit/pixel, and turn the
-   --  display on showing a blank screen. If the module's RESX pin is wired to
-   --  a GPIO, drive it high before calling this. Takes about 250 ms.
+   --  Reset the controller, configure it for 16 bit/pixel, blank the screen
+   --  and turn the display on. If the module's RESX pin is wired to a GPIO,
+   --  drive it high before calling this. Takes about 250 ms.
    procedure Initialize;
 
-   --  Set every pixel of the framebuffer to black. Not visible until Update.
+   --  Set every pixel to black.
    procedure Clear;
 
-   --  Write one pixel of the framebuffer. Not visible until Update.
+   --  Set one pixel. This is a whole transaction against the controller --
+   --  an address window and a memory write, thirteen bytes on the bus -- so
+   --  it is cheap for scattered pixels and slow for large areas.
    procedure Set_Pixel
       (X : Column;
        Y : Row;
        C : Color);
-
-   --  Send the whole framebuffer to the display.
-   procedure Update;
 end ST7735;
