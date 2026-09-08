@@ -13,9 +13,13 @@ executables = ["test"]
 
 [[depends-on]]
 pico_bsp = "^2.2.0"
-
-[[depends-on]]
 st7735 = "*"
 
 [[pins]]
 st7735 = { path='..' }
+
+[build-switches]
+release.optimization = ["-Os"]
+
+[build-profiles]
+"*" = "release"
