@@ -11,8 +11,10 @@ package body Board is
 
    SCK : RP.GPIO.GPIO_Point renames Pico.GP2;
    SDA : RP.GPIO.GPIO_Point renames Pico.GP3;
+   RST : RP.GPIO.GPIO_Point renames Pico.GP4;
    CS  : RP.GPIO.GPIO_Point renames Pico.GP5;
    DC  : RP.GPIO.GPIO_Point renames Pico.GP6;
+   BLK : RP.GPIO.GPIO_Point renames Pico.GP7;
 
    procedure Initialize is
    begin
@@ -25,6 +27,15 @@ package body Board is
       --  so they stay on SIO. Both idle high.
       CS.Configure (RP.GPIO.Output);
       DC.Configure (RP.GPIO.Output);
+
+      RST.Configure (RP.GPIO.Output);
+      RP.GPIO.Clear (RST);
+      Delay_Milliseconds (1);
+      RP.GPIO.Set (RST);
+
+      BLK.Configure (RP.GPIO.Output);
+      RP.GPIO.Set (BLK);
+
       Set_CS (True);
       Set_DC (True);
 
