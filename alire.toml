@@ -1,12 +1,12 @@
 name = "st7735"
-description = ""
-version = "0.1.0-dev"
+description = "ST7735 SPI LCD driver"
+version = "1.0.0"
 
 authors = ["Jeremy Grosser"]
 maintainers = ["Jeremy Grosser <jeremy@synack.me>"]
 maintainers-logins = ["JeremyGrosser"]
 licenses = "BSD-3-Clause"
-website = ""
+website = "https://github.com/JeremyGrosser/st7735"
 tags = []
 
 [[depends-on]]
