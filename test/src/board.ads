@@ -1,11 +1,10 @@
 with ST7735;
 with HAL;
 
---  A 128x160 ST7735R module on SPI0 of a Raspberry Pi Pico:
+--  A 1.8" 128x160 "green tab" ST7735S module on SPI0 of a Raspberry Pi Pico:
 --
---    GP2 -> SCK, GP3 -> SDA/MOSI, GP5 -> CS, GP6 -> DC
---
---  RESX is assumed tied high on the module; the driver resets in software.
+--    GP2 -> SCK, GP3 -> SDA/MOSI, GP4 -> RST, GP5 -> CS, GP6 -> DC,
+--    GP7 -> BLK (backlight)
 package Board is
    procedure Initialize;
 
@@ -25,5 +24,10 @@ package Board is
       (Set_CS             => Set_CS,
        Set_DC             => Set_DC,
        SPI_Write          => SPI_Write,
-       Delay_Milliseconds => Delay_Milliseconds);
+       Delay_Milliseconds => Delay_Milliseconds,
+       --  This panel's visible area starts at column 2, row 1 of frame
+       --  memory. With (0, 0) the last two columns and last row show
+       --  uninitialized noise along the edges.
+       X_Offset           => 2,
+       Y_Offset           => 1);
 end Board;

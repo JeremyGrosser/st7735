@@ -29,9 +29,12 @@ package body Board is
       DC.Configure (RP.GPIO.Output);
 
       RST.Configure (RP.GPIO.Output);
+      --  Hold RESX low at least 10 us, then allow 120 ms after release
+      --  before sending commands.
       RP.GPIO.Clear (RST);
-      Delay_Milliseconds (1);
+      Delay_Milliseconds (10);
       RP.GPIO.Set (RST);
+      Delay_Milliseconds (120);
 
       BLK.Configure (RP.GPIO.Output);
       RP.GPIO.Set (BLK);

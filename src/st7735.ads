@@ -1,6 +1,6 @@
 with HAL; use HAL;
 
---  Driver for the Sitronix ST7735R TFT controller in 16 bit/pixel mode over a
+--  Driver for the Sitronix ST7735R and ST7735S TFT controllers in 16 bit/pixel mode over a
 --  4-wire serial (MCU) interface. Register and timing references in the body
 --  are to the ST7735R datasheet, V0.2, 2009-08-05.
 --
@@ -24,10 +24,19 @@ generic
    --  and sleep-out settling times, which the controller does not signal.
    with procedure Delay_Milliseconds (Ms : Natural);
 
-   --  Frame memory is 132x162, one row and column larger than the panel, so
-   --  some modules are wired with the visible area offset into it. A "green
-   --  tab" 128x160 module typically needs (2, 1); a "red tab" one needs
-   --  (0, 0).
+   --  Frame memory can be up to 132x162, larger than the 128x160 panel, and
+   --  where the glass is bonded within it varies by module. Nothing on the
+   --  bus reveals this -- these modules have no SDO pin, and the ID commands
+   --  would only name the controller anyway -- so it is set here. The
+   --  protective film tab color is a rough guide:
+   --
+   --    Green tab   X_Offset => 2, Y_Offset => 1
+   --    Red tab     X_Offset => 0, Y_Offset => 0, BGR => True
+   --    Black tab   X_Offset => 0, Y_Offset => 0
+   --
+   --  Vendors are not consistent, so check with a test pattern: noise along
+   --  the right or bottom edge means the offsets are too small, a missing
+   --  row or column at the left or top means they are too large.
    X_Offset : Natural := 0;
    Y_Offset : Natural := 0;
 
@@ -54,8 +63,31 @@ package ST7735 is
    --  drive it high before calling this. Takes about 250 ms.
    procedure Initialize;
 
+   type Color_Array is array (Natural range <>) of Color;
+
    --  Set every pixel to black.
    procedure Clear;
+
+   --  Set every pixel in the rectangle X1 .. X2, Y1 .. Y2 to C, in a single
+   --  memory write.
+   procedure Fill
+      (X1, X2 : Column;
+       Y1, Y2 : Row;
+       C      : Color);
+
+   --  Stream pixels into the rectangle X1 .. X2, Y1 .. Y2. Start_Pixels opens
+   --  the memory write, each Put_Pixels call sends the next Colors'Length
+   --  pixels left to right, top to bottom, and End_Pixels closes it. Put_Pixels
+   --  packs Colors into a buffer on the stack of twice its length, so send a
+   --  row or so at a time rather than a whole screen.
+   procedure Start_Pixels
+      (X1, X2 : Column;
+       Y1, Y2 : Row);
+
+   procedure Put_Pixels
+      (Colors : Color_Array);
+
+   procedure End_Pixels;
 
    --  Set one pixel. This is a whole transaction against the controller --
    --  an address window and a memory write, thirteen bytes on the bus -- so
