@@ -24,24 +24,45 @@ generic
    --  and sleep-out settling times, which the controller does not signal.
    with procedure Delay_Milliseconds (Ms : Natural);
 
-   --  Frame memory can be up to 132x162, larger than the 128x160 panel, and
-   --  where the glass is bonded within it varies by module. Nothing on the
-   --  bus reveals this -- these modules have no SDO pin, and the ID commands
-   --  would only name the controller anyway -- so it is set here. The
-   --  protective film tab color is a rough guide:
+   --  True for the original ST7735 (sometimes marked ST7735B), sold on
+   --  "blue tab" modules. It needs different power and VCOM settings from
+   --  the ST7735R and ST7735S, which take identical commands.
+   ST7735B : Boolean := False;
+
+   --  Frame memory can be up to 132x162, larger than the panel, and where the
+   --  glass is bonded within it varies by module. Nothing on the bus reveals
+   --  this -- these modules have no SDO pin, and the ID commands would only
+   --  name the controller anyway -- so it is set here. The protective film
+   --  tab color is a rough guide, following Adafruit's naming. Offsets are
+   --  for this driver's orientation, which is Adafruit's rotation 2:
    --
-   --    Green tab   X_Offset => 2, Y_Offset => 1
-   --    Red tab     X_Offset => 0, Y_Offset => 0, BGR => True
-   --    Black tab   X_Offset => 0, Y_Offset => 0
+   --    Module                  Controller  X_Offset  Y_Offset  BGR
+   --    1.8" 128x160 green tab  R or S      2         1         True
+   --    1.8" 128x160 red tab    R or S      0         0         True
+   --    1.8" 128x160 black tab  R or S      0         0         False
+   --    1.8" 128x160 blue tab   B           0         0         True
+   --
+   --  Adafruit also sells these, which need Width and Height changed below:
+   --
+   --    1.44" 128x128 green tab R or S      2         1         True
+   --    0.96" 80x160 mini       R or S      24        0         False
+   --    0.96" 80x160 mini with  R or S      26        1         True
+   --      the plug-in FPC
+   --
+   --  The 1.44" panel sits 3 rows down from the other end of frame memory,
+   --  so its Y_Offset becomes 3 if the rows are ever mirrored. The plug-in
+   --  mini's glass is inverted: it needs INVON where Initialize sends INVOFF,
+   --  or every color comes out as its complement.
    --
    --  Vendors are not consistent, so check with a test pattern: noise along
    --  the right or bottom edge means the offsets are too small, a missing
-   --  row or column at the left or top means they are too large.
+   --  row or column at the left or top means they are too large, and swapped
+   --  red and blue means BGR is wrong.
    X_Offset : Natural := 0;
    Y_Offset : Natural := 0;
 
    --  True if the panel's subpixels are wired blue-green-red rather than
-   --  red-green-blue. If red and blue come out swapped, flip this.
+   --  red-green-blue.
    BGR : Boolean := False;
 package ST7735 is
    Width  : constant := 128;

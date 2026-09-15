@@ -16,12 +16,14 @@ package body ST7735 is
    FRMCTR2 : constant := 16#B2#;  --  Frame rate control, idle mode
    FRMCTR3 : constant := 16#B3#;  --  Frame rate control, partial mode
    INVCTR  : constant := 16#B4#;  --  Display inversion control
+   DISSET5 : constant := 16#B6#;  --  Display function setting (ST7735B)
    PWCTR1  : constant := 16#C0#;  --  Power control 1 (GVDD)
    PWCTR2  : constant := 16#C1#;  --  Power control 2 (VGH/VGL)
    PWCTR3  : constant := 16#C2#;  --  Power control 3, normal mode
    PWCTR4  : constant := 16#C3#;  --  Power control 4, idle mode
    PWCTR5  : constant := 16#C4#;  --  Power control 5, partial mode
    VMCTR1  : constant := 16#C5#;  --  VCOM control
+   PWCTR6  : constant := 16#FC#;  --  Power control 6, partial mode (ST7735B)
    GMCTRP1 : constant := 16#E0#;  --  Positive gamma correction
    GMCTRN1 : constant := 16#E1#;  --  Negative gamma correction
 
@@ -29,6 +31,9 @@ package body ST7735 is
    --  asks for 55h, which sets the RGB interface format to match, when 16
    --  bit/pixel data is written to frame memory.
    COLMOD_16BPP : constant UInt8 := 16#55#;
+
+   --  The ST7735B has no RGB interface, and takes the bare pixel format.
+   COLMOD_16BPP_B : constant UInt8 := 16#05#;
 
    --  MADCTL D3, the RGB/BGR order bit: 1 selects BGR (datasheet 10.1.27).
    MADCTL_BGR : constant UInt8 := 2#0000_1000#;
@@ -112,34 +117,56 @@ package body ST7735 is
       --  Both of these need 120 ms before the next command can be sent: the
       --  reset to load register defaults, the sleep out for the supply
       --  voltages and oscillator to settle (datasheet 10.1.2 and 10.1.11).
+      --  Reference drivers give the ST7735B 500 ms to come out of sleep.
       Command (SWRESET);
       Delay_Milliseconds (120);
       Command (SLPOUT);
-      Delay_Milliseconds (120);
+      Delay_Milliseconds (if ST7735B then 500 else 120);
 
-      --  The ST7735R and ST7735S take the same commands, but their reset
-      --  values for the panel registers are not guaranteed to match, and
-      --  either may be bonded to glass that wants something else. These are
-      --  the values the common 1.8" modules are tuned for: about 60 Hz,
-      --  column inversion, and the module vendors' power and gamma settings.
-      Command (FRMCTR1, (16#01#, 16#2C#, 16#2D#));
-      Command (FRMCTR2, (16#01#, 16#2C#, 16#2D#));
-      Command (FRMCTR3, (16#01#, 16#2C#, 16#2D#, 16#01#, 16#2C#, 16#2D#));
-      Command (INVCTR,  (1 => 16#07#));
-      Command (PWCTR1,  (16#A2#, 16#02#, 16#84#));
-      Command (PWCTR2,  (1 => 16#C5#));
-      Command (PWCTR3,  (16#0A#, 16#00#));
-      Command (PWCTR4,  (16#8A#, 16#2A#));
-      Command (PWCTR5,  (16#8A#, 16#EE#));
-      Command (VMCTR1,  (1 => 16#0E#));
-      Command (GMCTRP1,
-         (16#02#, 16#1C#, 16#07#, 16#12#, 16#37#, 16#32#, 16#29#, 16#2D#,
-          16#29#, 16#25#, 16#2B#, 16#39#, 16#00#, 16#01#, 16#03#, 16#10#));
-      Command (GMCTRN1,
-         (16#03#, 16#1D#, 16#07#, 16#06#, 16#2E#, 16#2C#, 16#29#, 16#2D#,
-          16#2E#, 16#2E#, 16#37#, 16#3F#, 16#00#, 16#00#, 16#02#, 16#10#));
+      --  Panel tuning. The controllers' reset values for these registers are
+      --  not guaranteed to suit the glass they are bonded to. These are the
+      --  values the common 1.8" modules are tuned for.
+      if ST7735B then
+         --  Fastest refresh with a 6 line front and 3 line back porch, line
+         --  inversion, GVDD 4.7 V, VGH 14.7 V, VGL -7.35 V, VCOMH 4 V and
+         --  VCOML -1.1 V.
+         Command (FRMCTR1, (16#00#, 16#06#, 16#03#));
+         Command (DISSET5, (16#15#, 16#02#));
+         Command (INVCTR,  (1 => 16#00#));
+         Command (PWCTR1,  (16#02#, 16#70#));
+         Command (PWCTR2,  (1 => 16#05#));
+         Command (PWCTR3,  (16#01#, 16#02#));
+         Command (VMCTR1,  (16#3C#, 16#38#));
+         Command (PWCTR6,  (16#11#, 16#15#));
+         Command (GMCTRP1,
+            (16#09#, 16#16#, 16#09#, 16#20#, 16#21#, 16#1B#, 16#13#, 16#19#,
+             16#17#, 16#15#, 16#1E#, 16#2B#, 16#04#, 16#05#, 16#02#, 16#0E#));
+         Command (GMCTRN1,
+            (16#0B#, 16#14#, 16#08#, 16#1E#, 16#22#, 16#1D#, 16#18#, 16#1E#,
+             16#1B#, 16#1A#, 16#24#, 16#2B#, 16#06#, 16#06#, 16#02#, 16#0F#));
+      else
+         --  About 60 Hz, column inversion, and the module vendors' power and
+         --  gamma settings.
+         Command (FRMCTR1, (16#01#, 16#2C#, 16#2D#));
+         Command (FRMCTR2, (16#01#, 16#2C#, 16#2D#));
+         Command (FRMCTR3, (16#01#, 16#2C#, 16#2D#, 16#01#, 16#2C#, 16#2D#));
+         Command (INVCTR,  (1 => 16#07#));
+         Command (PWCTR1,  (16#A2#, 16#02#, 16#84#));
+         Command (PWCTR2,  (1 => 16#C5#));
+         Command (PWCTR3,  (16#0A#, 16#00#));
+         Command (PWCTR4,  (16#8A#, 16#2A#));
+         Command (PWCTR5,  (16#8A#, 16#EE#));
+         Command (VMCTR1,  (1 => 16#0E#));
+         Command (GMCTRP1,
+            (16#02#, 16#1C#, 16#07#, 16#12#, 16#37#, 16#32#, 16#29#, 16#2D#,
+             16#29#, 16#25#, 16#2B#, 16#39#, 16#00#, 16#01#, 16#03#, 16#10#));
+         Command (GMCTRN1,
+            (16#03#, 16#1D#, 16#07#, 16#06#, 16#2E#, 16#2C#, 16#29#, 16#2D#,
+             16#2E#, 16#2E#, 16#37#, 16#3F#, 16#00#, 16#00#, 16#02#, 16#10#));
+      end if;
 
-      Command (COLMOD, (1 => COLMOD_16BPP));
+      Command (COLMOD,
+         (1 => (if ST7735B then COLMOD_16BPP_B else COLMOD_16BPP)));
       Command (MADCTL, (1 => (if BGR then MADCTL_BGR else 0)));
 
       Command (INVOFF);
