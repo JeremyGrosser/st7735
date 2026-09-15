@@ -1,5 +1,6 @@
 with HAL; use HAL;
 with RP.Timer; use RP.Timer;
+with Generic_Tiny_Text;
 with Board;
 
 --  Cycles through a set of animations, forever:
@@ -252,11 +253,47 @@ procedure Test is
       end loop;
    end Worm;
 
+   procedure Text is
+      procedure Set_Text_Pixel
+         (X, Y : Natural)
+      is
+      begin
+         Board.LCD.Set_Pixel
+            (X => Board.LCD.Column (X),
+             Y => Board.LCD.Row (Y),
+             C => White);
+      end Set_Text_Pixel;
+
+      package TT is new Generic_Tiny_Text
+         (Set_Pixel => Set_Text_Pixel,
+          Clear_Screen => Clear,
+          Width => Board.LCD.Width,
+          Height => Board.LCD.Height);
+      Deadline : constant Time := Clock + Scene_Time;
+      Next     : Time := Clock;
+      I : UInt32 := 0;
+      Top : constant := 5 * 6;
+   begin
+      Clear;
+      for Ch in TT.Printable'Range loop
+         TT.Put (Ch);
+      end loop;
+
+      while Clock < Deadline loop
+         Board.LCD.Fill (0, Board.LCD.Width - 1, Top, Top + 6, Black);
+         TT.Cursor := (0, Top);
+         TT.Put (I'Image);
+         Wait_Frame (Next, 15);
+         I := I + 1;
+      end loop;
+   end Text;
+
 begin
    Board.Initialize;
    Board.LCD.Initialize;
 
    loop
+      Text;
       Alignment;
       Boxes;
       Plasma;

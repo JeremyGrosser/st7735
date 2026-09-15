@@ -14,6 +14,7 @@ executables = ["test"]
 [[depends-on]]
 pico_bsp = "^2.2.0"
 st7735 = "*"
+tiny_text = "^1.5.1"
 
 [[pins]]
 st7735 = { path='..' }
