@@ -15,9 +15,11 @@ executables = ["test"]
 pico_bsp = "^2.2.0"
 st7735 = "*"
 tiny_text = "^1.5.1"
+sdf_fonts = "~0.1.0-dev"
 
 [[pins]]
 st7735 = { path='..' }
+sdf_fonts = { url='https://github.com/reznikmm/sdf_fonts' }
 
 [build-switches]
 release.optimization = ["-Os"]

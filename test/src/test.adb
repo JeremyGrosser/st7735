@@ -1,6 +1,7 @@
 with HAL; use HAL;
 with RP.Timer; use RP.Timer;
 with Generic_Tiny_Text;
+with SDF_Fonts.Roboto_Mono_20;
 with Board;
 
 --  Cycles through a set of animations, forever:
@@ -18,6 +19,7 @@ procedure Test is
 
    Black : constant Color := (0, 0, 0);
    White : constant Color := (31, 63, 31);
+   Green : constant Color := (0, 63, 0);
 
    Scene_Time : constant Time := Milliseconds (8_000);
 
@@ -288,11 +290,46 @@ procedure Test is
       end loop;
    end Text;
 
+   procedure SDF_Text is
+      procedure Draw_Pixel
+         (X, Y : Integer)
+      is
+      begin
+         if X >= 1 and then X <= Integer (Column'Last) and then
+            Y >= 1 and then Y <= Integer (Row'Last)
+         then
+            Board.LCD.Set_Pixel
+               (X => Column (X),
+                Y => Row'Last - Row (Y),
+                C => Green);
+         end if;
+      end Draw_Pixel;
+
+      procedure Render_String is new SDF_Fonts.Roboto_Mono_20.Render_String
+         (Pixel_Coordinate => Integer,
+          Draw_Pixel       => Draw_Pixel);
+
+      Deadline : constant Time := Clock + Scene_Time;
+
+      X : Integer := 0;
+   begin
+      Board.LCD.Clear;
+      Render_String
+         (X     => X,
+          Y     => Height - 20,
+          Scale => 20,
+          Text  => "Hello, SDF");
+      while Clock < Deadline loop
+         null;
+      end loop;
+   end SDF_Text;
+
 begin
    Board.Initialize;
    Board.LCD.Initialize;
 
    loop
+      SDF_Text;
       Text;
       Alignment;
       Boxes;
